@@ -22,8 +22,8 @@ def main():
 
 def extract_send_proposal_buttons():
     """
-    提取页面上所有的 Send Proposal 按钮
-    通过滚动加载更多元素，并悬停显示按钮
+    循环点击页面上所有的 Send Proposal 按钮
+    点击后关闭弹窗，继续点击下一个
     """
     url = 'https://app.impact.com/secure/advertiser/discover/radius/fr/partner_discover.ihtml?page=marketplace&slideout_id_type=partner#businessModels=all&sizeRating=large%2Cextra_large&sortBy=reachRating&sortOrder=DESC'
     tab.get(url)
@@ -37,52 +37,117 @@ def extract_send_proposal_buttons():
     print("3. 确保页面已正常加载")
     print("=" * 50)
     input("\n操作完成后，按 Enter 键继续...")
-    print("\n开始提取 Send Proposal 按钮...")
     
-    # 直接查找所有 Send Proposal 按钮（通过 data-testid）
-    buttons = tab.eles('css:button[data-testid="uicl-button"]')
-    send_proposal_buttons = [btn for btn in buttons if 'Send Proposal' in btn.text]
+    clicked_count = 0
+    total_scrolls = 0
+    max_scrolls = 50  # 最大滚动次数，防止无限循环
     
-    print(f"找到 {len(send_proposal_buttons)} 个 Send Proposal 按钮")
+    print("\n开始循环点击 Send Proposal 按钮...")
     
-    if send_proposal_buttons:
-        # 获取第一个按钮
-        first_btn = send_proposal_buttons[0]
+    while total_scrolls < max_scrolls:
+        # 查找当前可见的所有 Send Proposal 按钮
+        buttons = tab.eles('css:button[data-testid="uicl-button"]')
+        send_proposal_buttons = [btn for btn in buttons if 'Send Proposal' in btn.text]
         
-        # 向上查找父元素并悬停（触发按钮可见）
-        # 尝试找到包含按钮的可悬停容器
-        parent = first_btn.parent()
-        for _ in range(10):  # 最多向上查找10层
-            if parent:
-                try:
-                    # 尝试悬停
-                    tab.scroll.to_see(parent)
-                    time.sleep(0.2)
-                    parent.hover()
-                    time.sleep(0.3)
-                    
-                    # 检查按钮是否可点击
-                    print(f"正在尝试点击按钮...")
-                    first_btn.click()
-                    print("已点击第一个 Send Proposal 按钮！")
-                    time.sleep(1)
-                    return True
-                except Exception as e:
-                    print(f"尝试失败: {e}")
-                    parent = parent.parent()
-            else:
-                break
+        if not send_proposal_buttons:
+            print("当前页面没有 Send Proposal 按钮，滚动加载更多...")
+            tab.scroll.down(500)
+            time.sleep(1)
+            total_scrolls += 1
+            continue
         
-        # 如果常规点击失败，尝试 JS 点击
-        print("尝试使用 JS 点击...")
-        try:
-            tab.run_js('arguments[0].click()', first_btn)
-            print("已通过 JS 点击第一个 Send Proposal 按钮！")
+        # 遍历当前可见的按钮并点击
+        for btn in send_proposal_buttons:
+            try:
+                # 向上查找父元素并悬停
+                parent = btn.parent()
+                for _ in range(10):
+                    if parent:
+                        try:
+                            tab.scroll.to_see(parent)
+                            time.sleep(0.2)
+                            parent.hover()
+                            time.sleep(0.3)
+                            
+                            # 点击 Send Proposal 按钮
+                            btn.click()
+                            clicked_count += 1
+                            print(f"[{clicked_count}] 已点击 Send Proposal 按钮")
+                            time.sleep(0.5)
+                            
+                            # 在弹窗中选择 Public Commission
+                            select_public_commission()
+                            break
+                        except Exception:
+                            parent = parent.parent()
+                    else:
+                        break
+            except Exception as e:
+                print(f"点击按钮时出错: {e}")
+                continue
+        
+        # 滚动加载更多
+        tab.scroll.down(500)
+        time.sleep(1)
+        total_scrolls += 1
+        print(f"滚动第 {total_scrolls} 次，已点击 {clicked_count} 个按钮")
+    
+    print(f"\n===== 完成！共点击了 {clicked_count} 个 Send Proposal 按钮 =====")
+    return clicked_count
+
+
+def select_public_commission():
+    """
+    在弹窗的 iframe 中选择 Public Commission 选项
+    """
+    try:
+        time.sleep(1)  # 等待弹窗完全加载
+        
+        # 查找 iframe 并切换进去
+        iframe = tab.ele('css:iframe[data-testid="uicl-modal-iframe-content"]', timeout=3)
+        if not iframe:
+            print("  -> 未找到弹窗 iframe")
+            return False
+        
+        # 切换到 iframe 内部
+        iframe_tab = iframe.ele('text:Public Commission', timeout=5)
+        if iframe_tab:
+            iframe_tab.click(by_js=True)
+            print("  -> 已选择 Public Commission")
+            time.sleep(0.5)
             return True
-        except Exception as e:
-            print(f"JS 点击失败: {e}")
-    
-    print("未能点击任何 Send Proposal 按钮")
+        
+        # 备用方案：在 iframe 中用 CSS 选择器查找
+        options = iframe.eles('css:div.text-ellipsis')
+        for opt in options:
+            if 'Public Commission' in opt.text:
+                opt.click(by_js=True)
+                print("  -> 已选择 Public Commission")
+                time.sleep(0.5)
+                return True
+            
+        print("  -> 未找到 Public Commission 选项")
+        return False
+            
+    except Exception as e:
+        print(f"  -> 选择 Public Commission 失败: {e}")
+    return False
+
+
+def close_modal():
+    """
+    关闭弹窗
+    """
+    try:
+        # 查找关闭按钮
+        close_btn = tab.ele('css:button[data-testid="uicl-modal-close-button"]', timeout=2)
+        if close_btn:
+            close_btn.click()
+            print("  -> 已关闭弹窗")
+            time.sleep(0.3)
+            return True
+    except Exception as e:
+        print(f"  -> 关闭弹窗失败: {e}")
     return False
 
 
