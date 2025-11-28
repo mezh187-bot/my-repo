@@ -156,6 +156,9 @@ def select_public_commission(selected_tab=None):
             
             # 填写留言
             input_comment(iframe)
+            
+            # 点击提交按钮
+            submit_proposal(iframe)
             return True
         
         # 备用方案：在 iframe 中用 CSS 选择器查找
@@ -175,6 +178,9 @@ def select_public_commission(selected_tab=None):
                 
                 # 填写留言
                 input_comment(iframe)
+                
+                # 点击提交按钮
+                submit_proposal(iframe)
                 return True
             
         print("  -> 未找到 Public Commission 选项")
@@ -350,6 +356,93 @@ def input_comment(iframe):
         
     except Exception as e:
         print(f"  -> 填写留言失败: {e}")
+    return False
+
+
+def submit_proposal(iframe):
+    """
+    点击提交按钮提交 Proposal
+    """
+    try:
+        # 查找 iframe 中的 Send Proposal 提交按钮
+        submit_btn = iframe.ele('css:button[data-testid="uicl-button"]', timeout=3)
+        if submit_btn and 'Send Proposal' in submit_btn.text:
+            submit_btn.click(by_js=True)
+            print("  -> 已点击提交按钮")
+            time.sleep(1)
+            
+            # 点击确认按钮
+            click_understand_button(iframe)
+            return True
+        
+        # 备用方案：通过文本查找
+        submit_btn = iframe.ele('text:Send Proposal', timeout=2)
+        if submit_btn and submit_btn.tag == 'button':
+            submit_btn.click(by_js=True)
+            print("  -> 已点击提交按钮")
+            time.sleep(1)
+            
+            # 点击确认按钮
+            click_understand_button(iframe)
+            return True
+        
+        # 备用方案2：查找所有按钮
+        buttons = iframe.eles('css:button[data-testid="uicl-button"]')
+        for btn in buttons:
+            if 'Send Proposal' in btn.text:
+                btn.click(by_js=True)
+                print("  -> 已点击提交按钮")
+                time.sleep(1)
+                
+                # 点击确认按钮
+                click_understand_button(iframe)
+                return True
+        
+        print("  -> 未找到提交按钮")
+        return False
+        
+    except Exception as e:
+        print(f"  -> 点击提交按钮失败: {e}")
+    return False
+
+
+def click_understand_button(iframe):
+    """
+    点击 'I understand' 确认按钮
+    """
+    try:
+        time.sleep(0.5)  # 等待弹窗出现
+        
+        # 在 iframe 中查找 I understand 按钮
+        understand_btn = iframe.ele('text:I understand', timeout=3)
+        if understand_btn and understand_btn.tag == 'button':
+            understand_btn.click(by_js=True)
+            print("  -> 已点击 'I understand' 确认按钮")
+            time.sleep(0.5)
+            return True
+        
+        # 备用方案：查找所有按钮
+        buttons = iframe.eles('css:button[data-testid="uicl-button"]')
+        for btn in buttons:
+            if 'I understand' in btn.text:
+                btn.click(by_js=True)
+                print("  -> 已点击 'I understand' 确认按钮")
+                time.sleep(0.5)
+                return True
+        
+        # 备用方案2：在主页面查找（可能弹窗不在 iframe 内）
+        understand_btn = tab.ele('text:I understand', timeout=2)
+        if understand_btn and understand_btn.tag == 'button':
+            understand_btn.click(by_js=True)
+            print("  -> 已点击 'I understand' 确认按钮")
+            time.sleep(0.5)
+            return True
+        
+        print("  -> 未找到 'I understand' 按钮")
+        return False
+        
+    except Exception as e:
+        print(f"  -> 点击确认按钮失败: {e}")
     return False
 
 
