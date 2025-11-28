@@ -59,6 +59,9 @@ def extract_send_proposal_buttons():
         # 遍历当前可见的按钮并点击
         for btn in send_proposal_buttons:
             try:
+                # 先获取 selected-tab 的值（在点击按钮之前）
+                selected_tab = get_selected_tab_value(btn)
+                
                 # 向上查找父元素并悬停
                 parent = btn.parent()
                 for _ in range(10):
@@ -72,11 +75,11 @@ def extract_send_proposal_buttons():
                             # 点击 Send Proposal 按钮
                             btn.click()
                             clicked_count += 1
-                            print(f"[{clicked_count}] 已点击 Send Proposal 按钮")
+                            print(f"[{clicked_count}] 已点击 Send Proposal 按钮 (类别: {selected_tab})")
                             time.sleep(0.5)
                             
-                            # 在弹窗中选择 Public Commission
-                            select_public_commission()
+                            # 在弹窗中选择 Public Commission，并传入 selected_tab 值
+                            select_public_commission(selected_tab)
                             break
                         except Exception:
                             parent = parent.parent()
@@ -96,9 +99,37 @@ def extract_send_proposal_buttons():
     return clicked_count
 
 
-def select_public_commission():
+def get_selected_tab_value(btn):
     """
-    在弹窗的 iframe 中选择 Public Commission 选项，然后选择日期
+    获取按钮所在行的 selected-tab 值
+    """
+    try:
+        # 向上查找包含 selected-tab 的父元素
+        parent = btn.parent()
+        for _ in range(20):  # 最多向上查找20层
+            if parent:
+                selected_tab_ele = parent.ele('css:.selected-tab', timeout=0.1)
+                if selected_tab_ele:
+                    value = selected_tab_ele.text.strip()
+                    return value
+                parent = parent.parent()
+            else:
+                break
+        
+        # 备用方案：直接在页面查找
+        selected_tab_ele = tab.ele('css:.selected-tab', timeout=0.5)
+        if selected_tab_ele:
+            value = selected_tab_ele.text.strip()
+            return value
+            
+    except Exception as e:
+        print(f"  -> 获取 selected-tab 失败: {e}")
+    return None
+
+
+def select_public_commission(selected_tab=None):
+    """
+    在弹窗的 iframe 中选择 Public Commission 选项，输入 tag，然后选择日期
     """
     try:
         time.sleep(1)  # 等待弹窗完全加载
@@ -116,6 +147,10 @@ def select_public_commission():
             print("  -> 已选择 Public Commission")
             time.sleep(0.5)
             
+            # 如果有 selected_tab 值，在 tag-input 中输入并选择
+            if selected_tab:
+                input_tag_and_select(iframe, selected_tab)
+            
             # 选择日期（第二天）
             select_tomorrow_date(iframe)
             return True
@@ -128,6 +163,10 @@ def select_public_commission():
                 print("  -> 已选择 Public Commission")
                 time.sleep(0.5)
                 
+                # 如果有 selected_tab 值，在 tag-input 中输入并选择
+                if selected_tab:
+                    input_tag_and_select(iframe, selected_tab)
+                
                 # 选择日期（第二天）
                 select_tomorrow_date(iframe)
                 return True
@@ -138,6 +177,77 @@ def select_public_commission():
     except Exception as e:
         print(f"  -> 选择 Public Commission 失败: {e}")
     return False
+
+
+def input_tag_and_select(iframe, selected_tab):
+    """
+    在 tag-input 中输入值并从下拉列表中选择
+    """
+    try:
+        # 处理 selected_tab 值，去掉所有空格
+        # "Content / Reviews" -> "Content/Reviews"
+        search_text = selected_tab.replace(" ", "")
+        
+        # 查找 tag-input 输入框
+        tag_input = iframe.ele('css:input[data-testid="uicl-tag-input-text-input"]', timeout=3)
+        if not tag_input:
+            raise Exception("未找到 tag-input 输入框")
+        
+        # 点击输入框
+        tag_input.click(by_js=True)
+        time.sleep(0.3)
+        
+        # 输入搜索文本
+        tag_input.input(search_text)
+        print(f"  -> 已输入 tag: {search_text}")
+        time.sleep(0.5)
+        
+        # 等待下拉列表出现并选择匹配项
+        dropdown = iframe.ele('css:[data-testid="uicl-tag-input-dropdown"]', timeout=3)
+        if not dropdown:
+            raise Exception("未找到下拉列表，输入后没有出现填充项")
+        
+        # 查找下拉列表中的选项文本（如 "Content/Reviews (136819)"）
+        option_div = dropdown.ele('css:div._4-15-1_Baf2T', timeout=2)
+        if not option_div:
+            # 备用方案：查找 li 元素
+            options = dropdown.eles('css:li')
+            if not options:
+                raise Exception("下拉列表中没有选项")
+            option_div = options[0]
+        
+        option_text = option_div.text.strip()
+        print(f"  -> 下拉选项文本: {option_text}")
+        
+        # 提取选项中的类别名称（去掉括号中的数字）
+        # "Content/Reviews (136819)" -> "Content/Reviews"
+        import re
+        option_category = re.sub(r'\s*\(\d+\)\s*$', '', option_text).replace(" ", "")
+        
+        # 验证输入的值和下拉选项是否匹配
+        if search_text.lower() != option_category.lower():
+            raise Exception(f"输入值 '{search_text}' 与下拉选项 '{option_category}' 不匹配")
+        
+        # 点击选项
+        option_div.click(by_js=True)
+        print(f"  -> 已选择下拉选项: {option_text}")
+        time.sleep(0.3)
+        
+        # 验证选择是否成功（检查输入框或 hidden input 的值）
+        # 查找 tag 容器，确认已添加
+        tag_container = iframe.ele('css:.iui-tag-input', timeout=1)
+        if tag_container:
+            # 检查是否有已选中的 tag
+            selected_tags = tag_container.eles('css:.tag, [class*="tag"]')
+            if selected_tags:
+                print(f"  -> 验证成功，已选择 tag")
+                return True
+        
+        return True
+            
+    except Exception as e:
+        print(f"  -> 输入 tag 并选择失败: {e}")
+        raise  # 重新抛出异常
 
 
 def select_tomorrow_date(iframe):
