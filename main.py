@@ -129,7 +129,7 @@ def get_selected_tab_value(btn):
 
 def select_public_commission(selected_tab=None):
     """
-    在弹窗的 iframe 中选择 Public Commission 选项，输入 tag，然后选择日期
+    在弹窗的 iframe 中选择 Public Commission 选项，输入 tag，然后选择日期，最后填写留言
     """
     try:
         time.sleep(1)  # 等待弹窗完全加载
@@ -153,6 +153,9 @@ def select_public_commission(selected_tab=None):
             
             # 选择日期（第二天）
             select_tomorrow_date(iframe)
+            
+            # 填写留言
+            input_comment(iframe)
             return True
         
         # 备用方案：在 iframe 中用 CSS 选择器查找
@@ -169,6 +172,9 @@ def select_public_commission(selected_tab=None):
                 
                 # 选择日期（第二天）
                 select_tomorrow_date(iframe)
+                
+                # 填写留言
+                input_comment(iframe)
                 return True
             
         print("  -> 未找到 Public Commission 选项")
@@ -295,6 +301,55 @@ def select_tomorrow_date(iframe):
             
     except Exception as e:
         print(f"  -> 选择日期失败: {e}")
+    return False
+
+
+# 留言模板
+COMMENT_TEMPLATE = """Dear Partner,
+
+I'm Jade, manager of the Trucktok Affiliate Program (ID: 44072).
+
+TruckTok is a trusted brand specializing in high-demand diesel delete kits and all-in-one intake & exhaust systems for Ford Powerstroke, GM Duramax, and RAM Cummins.
+
+As a specialized leader in the diesel performance market, our strong brand recognition translates directly into high conversion rates—and significant earning potential for you.
+
+We offer:
+- Up to 15% commission on all sales
+- High-performing creatives and full support
+- Strong conversion rates backed by consumer trust
+Our website: https://www.trucktok.com/
+
+We believe this is a powerful opportunity and would love for you to join us!
+
+Best, 
+Trucktok Affiliate Team"""
+
+
+def input_comment(iframe):
+    """
+    在 textarea 中输入留言内容
+    """
+    try:
+        # 查找 textarea
+        textarea = iframe.ele('css:textarea[data-testid="uicl-textarea"]', timeout=3)
+        if not textarea:
+            textarea = iframe.ele('css:textarea[name="comment"]', timeout=2)
+        
+        if not textarea:
+            print("  -> 未找到留言输入框")
+            return False
+        
+        # 清空并输入内容
+        textarea.click(by_js=True)
+        time.sleep(0.2)
+        textarea.clear()
+        textarea.input(COMMENT_TEMPLATE)
+        print("  -> 已填写留言内容")
+        time.sleep(0.3)
+        return True
+        
+    except Exception as e:
+        print(f"  -> 填写留言失败: {e}")
     return False
 
 
