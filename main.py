@@ -98,7 +98,7 @@ def extract_send_proposal_buttons():
 
 def select_public_commission():
     """
-    在弹窗的 iframe 中选择 Public Commission 选项
+    在弹窗的 iframe 中选择 Public Commission 选项，然后选择日期
     """
     try:
         time.sleep(1)  # 等待弹窗完全加载
@@ -109,12 +109,15 @@ def select_public_commission():
             print("  -> 未找到弹窗 iframe")
             return False
         
-        # 切换到 iframe 内部
-        iframe_tab = iframe.ele('text:Public Commission', timeout=5)
-        if iframe_tab:
-            iframe_tab.click(by_js=True)
+        # 在 iframe 中查找并点击 Public Commission
+        option = iframe.ele('text:Public Commission', timeout=5)
+        if option:
+            option.click(by_js=True)
             print("  -> 已选择 Public Commission")
             time.sleep(0.5)
+            
+            # 选择日期（第二天）
+            select_tomorrow_date(iframe)
             return True
         
         # 备用方案：在 iframe 中用 CSS 选择器查找
@@ -124,6 +127,9 @@ def select_public_commission():
                 opt.click(by_js=True)
                 print("  -> 已选择 Public Commission")
                 time.sleep(0.5)
+                
+                # 选择日期（第二天）
+                select_tomorrow_date(iframe)
                 return True
             
         print("  -> 未找到 Public Commission 选项")
@@ -131,6 +137,54 @@ def select_public_commission():
             
     except Exception as e:
         print(f"  -> 选择 Public Commission 失败: {e}")
+    return False
+
+
+def select_tomorrow_date(iframe):
+    """
+    在 iframe 中选择日期（第二天）
+    """
+    try:
+        # 点击日期输入按钮打开日期选择器
+        date_btn = iframe.ele('css:button[data-testid="uicl-date-input"]', timeout=3)
+        if date_btn:
+            date_btn.click(by_js=True)
+            print("  -> 已打开日期选择器")
+            time.sleep(0.5)
+            
+            # 查找并点击明天的日期
+            # 日期选择器通常会高亮今天，明天是下一个可选日期
+            # 查找日期选择器中的日期按钮
+            from datetime import datetime, timedelta
+            tomorrow = datetime.now() + timedelta(days=1)
+            tomorrow_day = str(tomorrow.day)
+            
+            # 查找包含明天日期的按钮/元素
+            # 通常日期选择器的日期是按钮或可点击的 div
+            date_cells = iframe.eles('css:td, .day, [class*="day"], [class*="date"]')
+            for cell in date_cells:
+                if cell.text.strip() == tomorrow_day:
+                    cell.click(by_js=True)
+                    print(f"  -> 已选择日期: {tomorrow.strftime('%Y-%m-%d')}")
+                    time.sleep(0.3)
+                    return True
+            
+            # 备用方案：通过文本查找
+            date_ele = iframe.ele(f'text={tomorrow_day}', timeout=2)
+            if date_ele:
+                date_ele.click(by_js=True)
+                print(f"  -> 已选择日期: {tomorrow.strftime('%Y-%m-%d')}")
+                time.sleep(0.3)
+                return True
+                
+            print("  -> 未找到明天的日期")
+            return False
+        else:
+            print("  -> 未找到日期输入按钮")
+            return False
+            
+    except Exception as e:
+        print(f"  -> 选择日期失败: {e}")
     return False
 
 
