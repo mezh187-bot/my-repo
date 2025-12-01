@@ -52,8 +52,8 @@ def init_browser():
         return False
 
 
-def reconnect_browser(url=None):
-    """重新连接浏览器并恢复页面"""
+def reconnect_browser():
+    """重新连接浏览器"""
     global browser, tab
     console.print("[yellow]检测到页面断开，正在重新连接...[/yellow]")
     logger.warning("页面断开，尝试重新连接浏览器")
@@ -63,12 +63,6 @@ def reconnect_browser(url=None):
         try:
             browser = Chromium()
             tab = browser.latest_tab
-            
-            # 如果提供了 URL，导航到该页面
-            if url:
-                tab.get(url)
-                tab.wait.doc_loaded()
-                time.sleep(1)
             
             console.print("[green]✓ 浏览器重新连接成功[/green]")
             logger.info("浏览器重新连接成功")
@@ -769,16 +763,13 @@ def extract_send_proposal_buttons(max_count=10):
     """
     global tab
     
-    url = 'https://app.impact.com/secure/advertiser/discover/radius/fr/partner_discover.ihtml?page=marketplace&slideout_id_type=partner#businessModels=all&sizeRating=large%2Cextra_large&sortBy=reachRating&sortOrder=DESC'
-    tab.get(url)
-    tab.wait.doc_loaded()
-    
     # 等待用户操作完成（如登录、人机验证等）
     console.print(Panel(
-        "[bold]浏览器已打开，请完成以下操作：[/bold]\n"
-        "1. 登录账号（如果需要）\n"
-        "2. 完成人机验证（如果出现）\n"
-        "3. 确保页面已正常加载",
+        "[bold]请在浏览器中完成以下操作：[/bold]\n"
+        "1. 导航到目标页面\n"
+        "2. 登录账号（如果需要）\n"
+        "3. 完成人机验证（如果出现）\n"
+        "4. 确保页面已正常加载",
         title="[cyan]提示[/cyan]",
         border_style="cyan"
     ))
@@ -798,9 +789,9 @@ def extract_send_proposal_buttons(max_count=10):
         # 检查是否需要重连
         if consecutive_errors >= max_consecutive_errors:
             console.print("[yellow]连续多次错误，尝试重新连接浏览器...[/yellow]")
-            if reconnect_browser(url):
+            if reconnect_browser():
                 consecutive_errors = 0
-                time.sleep(2)  # 等待页面加载
+                time.sleep(1)
                 continue
             else:
                 console.print("[red]重连失败，停止执行[/red]")
@@ -813,9 +804,9 @@ def extract_send_proposal_buttons(max_count=10):
             if buttons is None:
                 # 元素查找失败，可能页面已断开
                 consecutive_errors += 1
-                if reconnect_browser(url):
+                if reconnect_browser():
                     consecutive_errors = 0
-                    time.sleep(2)
+                    time.sleep(1)
                 continue
             
             send_proposal_buttons = [btn for btn in buttons if btn and 'Send Proposal' in (btn.text or '')]
