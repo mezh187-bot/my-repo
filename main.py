@@ -31,7 +31,7 @@ class ConfigManager:
             "max_proposals": 10,
             "scroll_delay": 1.0,
             "click_delay": 0.5,
-            "modal_wait": 1.0
+            "modal_wait": 20.0
         }
         
         # 确保目录存在
@@ -331,13 +331,15 @@ class BrowserManager:
 class ProposalSender:
     """Proposal发送类，负责核心的RPA操作"""
     
-    def __init__(self, browser: BrowserManager, template_manager: TemplateManager, console: Console):
+    def __init__(self, browser: BrowserManager, template_manager: TemplateManager, console: Console, config: ConfigManager):
         self.browser = browser
         self.template_manager = template_manager
         self.console = console
         self.max_scrolls = 100
         self.max_consecutive_errors = 3
-        self.modal_wait_timeout = 8.0
+        # 从配置中读取弹窗等待时间，默认 20 秒，用于应对 iframe 加载较慢的情况
+        settings = config.load_settings()
+        self.modal_wait_timeout = float(settings.get("modal_wait", 20.0))
         self.modal_poll_interval = 0.2
         self.counted_attr = 'data-impact-rpa-counted'
         self.clicked_attr = 'data-impact-rpa-clicked'
@@ -1189,7 +1191,7 @@ class ImpactRPA:
         self.config = ConfigManager()
         self.template_manager = TemplateManager(self.config)
         self.browser = BrowserManager(self.console)
-        self.proposal_sender = ProposalSender(self.browser, self.template_manager, self.console)
+        self.proposal_sender = ProposalSender(self.browser, self.template_manager, self.console, self.config)
         self.menu = MenuUI(self.config, self.template_manager, self.console)
     
     def start(self):
