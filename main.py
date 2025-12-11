@@ -339,6 +339,8 @@ class ProposalSender:
         self.max_consecutive_errors = 3
         self.modal_wait_timeout = 8.0
         self.modal_poll_interval = 0.2
+        self.counted_attr = 'data-impact-rpa-counted'
+        self.clicked_attr = 'data-impact-rpa-clicked'
     
     def send_proposals(self, max_count: int = 10, template_content: str | None = None) -> int:
         """
@@ -370,6 +372,8 @@ class ProposalSender:
         clicked_count = 0
         total_scrolls = 0
         consecutive_errors = 0
+        pending_batch_buttons = 0
+        total_detected_buttons = 0
         
         self.console.print(f"\n[bold cyan]开始循环点击 Send Proposal 按钮 (目标: {max_count} 个)...[/bold cyan]")
         
@@ -396,21 +400,54 @@ class ProposalSender:
                         time.sleep(1)
                     continue
                 
-                send_proposal_buttons = [btn for btn in buttons if btn and 'Send Proposal' in (btn.text or '')]
-                
-                if not send_proposal_buttons:
-                    logger.debug("当前页面没有 Send Proposal 按钮，滚动加载更多...")
-                    if not self.browser.scroll_down(500):
-                        consecutive_errors += 1
+                send_proposal_buttons = []
+                for btn in buttons:
+                    if not btn:
                         continue
-                    time.sleep(1)
-                    total_scrolls += 1
-                    continue
+                    if 'Send Proposal' in (btn.text or ''):
+                        send_proposal_buttons.append(btn)
+                
+                available_buttons = []
+                newly_counted = 0
+                for btn in send_proposal_buttons:
+                    if btn.attr(self.clicked_attr) == 'true':
+                        continue
+                    if btn.attr(self.counted_attr) != 'true':
+                        if self._mark_button_state(btn, self.counted_attr):
+                            pending_batch_buttons += 1
+                            total_detected_buttons += 1
+                            newly_counted += 1
+                    available_buttons.append(btn)
+                
+                if newly_counted > 0:
+                    self.console.print(
+                        f"[dim]检测到新按钮 {newly_counted} 个，当前批次待发送 {pending_batch_buttons} 个（累计 {total_detected_buttons} 个）[/dim]"
+                    )
+                    logger.debug(
+                        f"新增 {newly_counted} 个 Send Proposal 按钮，当前批次待发送 {pending_batch_buttons} 个"
+                    )
+                
+                if not available_buttons:
+                    if pending_batch_buttons <= 0:
+                        logger.debug("当前页面没有未发送的 Send Proposal 按钮，滚动加载更多...")
+                        if not self.browser.scroll_down(500):
+                            consecutive_errors += 1
+                            continue
+                        time.sleep(1)
+                        total_scrolls += 1
+                        continue
+                    else:
+                        logger.debug("存在待发送计数但未找到按钮，重置计数以避免阻塞")
+                        pending_batch_buttons = 0
+                        continue
+                
+                send_proposal_buttons = available_buttons
                 
                 # 重置连续错误计数
                 consecutive_errors = 0
                 
                 # 遍历当前可见的按钮并点击
+                should_scroll_after_batch = False
                 for btn in send_proposal_buttons:
                     if clicked_count >= max_count:
                         logger.info(f"已达到目标数量 {max_count}，停止发送")
@@ -437,6 +474,11 @@ class ProposalSender:
                                     logger.info(f"[{clicked_count}/{max_count}] 已点击 Send Proposal 按钮 (类别: {selected_tab})")
                                     self.console.print(f"[green]✓ [{clicked_count}/{max_count}][/green] 已点击 Send Proposal 按钮 [dim](类别: {selected_tab})[/dim]")
                                     time.sleep(0.5)
+                                    self._mark_button_state(btn, self.clicked_attr)
+                                    if pending_batch_buttons > 0:
+                                        pending_batch_buttons = max(pending_batch_buttons - 1, 0)
+                                    if pending_batch_buttons == 0:
+                                        should_scroll_after_batch = True
                                     
                                     self._handle_proposal_modal(selected_tab, template_content)
                                     break
@@ -462,6 +504,21 @@ class ProposalSender:
                 if clicked_count >= max_count:
                     break
                 
+                if should_scroll_after_batch:
+                    if not self.browser.scroll_down(500):
+                        consecutive_errors += 1
+                        continue
+                    time.sleep(1)
+                    total_scrolls += 1
+                    self.console.print(
+                        f"[dim]当前批次已发送完，滚动第 {total_scrolls} 次加载更多按钮[/dim]"
+                    )
+                    continue
+                
+                if pending_batch_buttons > 0:
+                    # 仍有待发送的已计数按钮，继续下一轮尝试，不滚动
+                    continue
+
                 if not self.browser.scroll_down(500):
                     consecutive_errors += 1
                     continue
@@ -774,6 +831,22 @@ class ProposalSender:
             time.sleep(self.modal_poll_interval)
         logger.warning("等待 Proposal 弹窗超时")
         return None
+
+    def _mark_button_state(self, button, attr: str, value: str = "true") -> bool:
+        """为按钮设置指定的 DOM 属性标记"""
+        try:
+            current = button.attr(attr)
+            if current == value:
+                return True
+            button.attr(attr, value)
+            return True
+        except Exception:
+            try:
+                button.run_js(f'this.setAttribute("{attr}", "{value}")')
+                return True
+            except Exception as e:
+                logger.debug(f"设置按钮属性 {attr} 失败: {e}")
+        return False
 
 
 class MenuUI:
