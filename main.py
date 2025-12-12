@@ -259,7 +259,7 @@ class BrowserManager:
                 e,
                 context={
                     "operation": "查找元素",
-                    "selector": selector,
+                    "locator": locator,
                     "timeout": timeout
                 }
             )
@@ -272,7 +272,7 @@ class BrowserManager:
                     e,
                     context={
                         "operation": "查找元素",
-                        "selector": selector,
+                        "locator": locator,
                         "timeout": timeout,
                         "error_type": "页面断开"
                     }
@@ -433,8 +433,6 @@ class ProposalSender:
                         },
                         send_notification=True
                     )
-                    continue
-            else:
                     self.console.print("[red]重连失败，停止执行[/red]")
                     break
             
