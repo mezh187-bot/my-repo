@@ -1,6 +1,13 @@
 {
-    "max_proposals": 10,
-    "scroll_delay": 1.0,
-    "click_delay": 0.5,
-    "modal_wait": 20.0
+  "max_proposals": 10,
+  "scroll_delay": 1.0,
+  "click_delay": 0.5,
+  "modal_wait": 20.0,
+
+  "tab_tag_map": {
+    "Deal / Coupons": "Deal/Coupons",
+    "Creators": "Creators"
+  },
+
+  "default_tag": "Deal/Coupons"
 }
